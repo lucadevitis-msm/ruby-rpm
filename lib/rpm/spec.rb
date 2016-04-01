@@ -3,49 +3,57 @@ module RPM
 
     class ParseError < StandardError ; end
 
-    attr_accessor :define
-    attr_accessor :tag
-    attr_accessor :body
-
     class << self
       # @example
-      #   RPM::Spec.open('file.spec')
-      def open(spec)
-        new(spec)
-      end
+      #   RPM::Spec.open('file.spec') do
+      #     ...
+      #   end
+      alias_method :open, :new
 
       # @example
-      #   File.open('file.spec') { |file| RPM::Spec.read(file) }
+      #   File.open('file.spec') { |file| spec = RPM::Spec.read(file) }
       alias_method :read, :open
     end
 
     # @example
     #   RPM::Spec.new 'file.spec'
     #   RPM::Spec.new do |spec|
-    #     spec.define = name: 'my-package',
-    #                   version: '1.0.0'
-    #     spec.tag = Name: '%{name}',
-    #                Version: '%{version}'
-    #     spec.body = description: 'Some Description'
+    #     spec.define name: 'my-package',
+    #                 version: '1.0.0'
+    #     spec.tag Name: '%{name}',
+    #              Version: '%{version}'
+    #     spec.body description: 'Some Description'
     #   end
     def initialize(spec = nil)
-      @content = ''
       @define = {}
       @tag = {}
       @body = Hash.new('')
-      self.load(spec) if spec
+      load(spec) if spec
       yield self if block_given?
+    end
+
+    [ :define, :tag, :body ].each do |name|
+      define_method(name) do |value = nil|
+        instance_variable_set "@:#{name}", value if value
+        instance_variable_get "@:#{name}"
+      end
     end
 
     def load(spec)
       case spec
-      when String then File.open(spec) { |file| parse(file) }
-      when IO then parse(spec)
-      else raise ArgumentError.new("Can't load from #{spec.class}")
+        when String
+          File.open(spec) { |file| parse(file) }
+        when IO
+          parse(spec)
+        when Hash
+          [ :define, :tag, :body ].each { |k| send k, spec[k] if spec[k] }
+        else
+          raise ArgumentError.new("Can't load from #{spec.class}")
       end
     end
 
     def parse(file)
+      @content = []
       continue = nil
       file.each_line do |line|
         @content << line
@@ -69,11 +77,11 @@ module RPM
           name, value = $1.to_sym, $2.strip
           tag[name] = value
         else
-          raise RPM::Spec::ParseError.new(line) if continue.nil?
+          raise RPM::Spec::ParseError.new(@content.size + 1, line) if continue.nil?
           continue << line
         end
       end
-
+      @content = @content.join ''
     end
 
     def dump(spec)
@@ -96,6 +104,10 @@ module RPM
         ).join("\n")
       end
       @content
+    end
+
+    def to_h
+      { define: define, tag: tag, body: body }
     end
 
     private :load, :parse
