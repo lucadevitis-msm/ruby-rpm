@@ -8,11 +8,11 @@ module RPM
       #   RPM::Spec.open('file.spec') do
       #     ...
       #   end
-      alias_method :open, :new
+      alias open new
 
       # @example
       #   File.open('file.spec') { |file| spec = RPM::Spec.read(file) }
-      alias_method :read, :open
+      alias read open
     end
 
     # @example
@@ -24,7 +24,7 @@ module RPM
     #              Version: '%{version}'
     #     spec.body description: 'Some Description'
     #   end
-    def initialize(spec = nil)
+    def initialize(spec = nil, &block)
       @define = {}
       @tag = {}
       @body = Hash.new('')
@@ -81,6 +81,7 @@ module RPM
           continue << line
         end
       end
+      [:name, :version, :release].each {|n| define[n] ||= tag[n.capitalize]}
       @content = @content.join ''
     end
 

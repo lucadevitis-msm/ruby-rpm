@@ -9,19 +9,12 @@ module Rake
       define if block_given?
     end
 
-    def spec=(path)
-      @spec = RPM::Spec.new path
+    def spec (details, &block)
+      @spec ||= RPM::Spec.new details, &block
     end
 
-    def spec
-      if @spec.nil?
-        @spec = RPM::Spec.new
-      end
-      @spec
-    end
-
-    def init(spec_path, topdir_path)
-      spec = spec_path
+    def init(path, topdir_path)
+      spec path
       _topdir = topdir_path || spec.define[:_topdir] || './rpmbuild'
     end
 
